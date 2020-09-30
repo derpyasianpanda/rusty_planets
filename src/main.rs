@@ -83,8 +83,8 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
     }
 }
 
-/// Returns a Hash Map the gravitational influence for each planet. (Influence measured
-/// by acceleration [km/s^2])
+/// Returns a Hash Map of the gravitational influence for each planet.
+/// Influence measured by acceleration (km/s^2)
 ///
 /// # Arguments
 ///
