@@ -27,7 +27,8 @@ fn main() {
 }
 
 fn model(_app: &App) -> Model {
-    let mut planetoids: HashMap<String, Planetoid> = HashMap::new();
+    let mut planetoids = HashMap::new();
+
     planetoids.insert(
         "DAY-GO-BAH".to_string(),
         Planetoid {
@@ -81,9 +82,9 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
     for info in model.planetoids.iter_mut() {
         let (name, planetoid) = info;
         if planetoid.is_active {
-            let progress_per_second: f32 = model.time_scale as f32 / model.update_rate as f32;
-            planetoid.speed += *influences.get(name).unwrap() * progress_per_second;
-            planetoid.position += planetoid.speed * progress_per_second;
+            let progress_per_update = model.time_scale as f32 / model.update_rate as f32;
+            planetoid.speed += *influences.get(name).unwrap() * progress_per_update;
+            planetoid.position += planetoid.speed * progress_per_update;
         }
     }
 }
@@ -98,7 +99,7 @@ fn handle_collisions(model: &mut Model) {
         for info_2 in model.planetoids.iter() {
             let (name_2, planetoid_2) = info_2;
             if name != name_2 {
-                let distance: f32 = (planetoid.position - planetoid_2.position).magnitude();
+                let distance = (planetoid.position - planetoid_2.position).magnitude();
                 if distance <= planetoid.size.x + planetoid_2.size.x {
                     if planetoid.size.x > planetoid_2.size.x {
                         updates.insert(name.clone(), (planetoid_2.mass, planetoid_2.size));
@@ -138,15 +139,15 @@ fn get_gravitational_influences(model: &Model) -> HashMap<String, Vector2> {
         for info_2 in model.planetoids.iter() {
             let (name_2, planetoid_2) = info_2;
             if (name != name_2) && planetoid.is_active {
-                let distance: f32 = ((planetoid_2.position.x - planetoid.position.x).powi(2)
+                let distance = ((planetoid_2.position.x - planetoid.position.x).powi(2)
                     + (planetoid_2.position.y - planetoid.position.y).powi(2))
                 .sqrt();
 
-                let gravitational_force: f32 =
+                let gravitational_force =
                     model.gravitational_const * planetoid.mass * planetoid_2.mass
                         / distance.powi(2);
 
-                let acceleration: Vector2 = vec2(
+                let acceleration = vec2(
                     planetoid_2.position.x - planetoid.position.x,
                     planetoid_2.position.y - planetoid.position.y,
                 )
