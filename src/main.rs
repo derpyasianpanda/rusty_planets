@@ -1,5 +1,6 @@
 use nannou::prelude::*;
 use std::collections::HashMap;
+use std::collections::BinaryHeap;
 
 // Distance units are in kilometers and time is measured in seconds
 struct Planetoid {
@@ -15,7 +16,7 @@ struct Model {
     gravitational_const: f32,
     time_scale: u8,
     update_rate: u8,
-    planetoids: HashMap<String, Planetoid>,
+    planetoids: Vec<Planetoid>,
 }
 
 fn main() {
@@ -27,10 +28,9 @@ fn main() {
 }
 
 fn model(_app: &App) -> Model {
-    let mut planetoids = HashMap::new();
+    let mut planetoids = vec![];
 
-    planetoids.insert(
-        "DAY-GO-BAH".to_string(),
+    planetoids.push(
         Planetoid {
             position: vec2(0.0, 0.0),
             size: vec2(20.0, 20.0),
@@ -38,11 +38,10 @@ fn model(_app: &App) -> Model {
             mass: 6.0 * 10.0.powi(24),
             is_active: true,
             color: GREEN,
-        },
+        }
     );
 
-    planetoids.insert(
-        "Tattoo ween".to_string(),
+    planetoids.push(
         Planetoid {
             position: vec2(-450.0, 0.0),
             size: vec2(10.0, 10.0),
@@ -50,11 +49,10 @@ fn model(_app: &App) -> Model {
             mass: 3.0 * 10.0.powi(22),
             is_active: true,
             color: ORANGE,
-        },
+        }
     );
 
-    planetoids.insert(
-        "Tattoo weenie".to_string(),
+    planetoids.push(
         Planetoid {
             position: vec2(-400.0, 0.0),
             size: vec2(20.0, 20.0),
@@ -62,7 +60,7 @@ fn model(_app: &App) -> Model {
             mass: 3.0 * 10.0.powi(19),
             is_active: true,
             color: ORANGE,
-        },
+        }
     );
 
     Model {
@@ -76,14 +74,12 @@ fn model(_app: &App) -> Model {
 
 // Update runs 60fps default
 fn update(_app: &App, model: &mut Model, _update: Update) {
+    let progress_per_update = model.time_scale as f32 / model.update_rate as f32;
     handle_collisions(model);
-    let influences = get_gravitational_influences(&model);
+    calculate_gravitational_influences(model, progress_per_update);
 
-    for info in model.planetoids.iter_mut() {
-        let (name, planetoid) = info;
+    for planetoid in model.planetoids.iter_mut() {
         if planetoid.is_active {
-            let progress_per_update = model.time_scale as f32 / model.update_rate as f32;
-            planetoid.speed += *influences.get(name).unwrap() * progress_per_update;
             planetoid.position += planetoid.speed * progress_per_update;
         }
     }
@@ -91,54 +87,57 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
 
 fn event(_app: &App, _model: &mut Model, _event: Event) {}
 
+// TODO: FIX COLLISIONS. THINGS DISAPPEAR WHEN THEY SHOULDN'T
 fn handle_collisions(model: &mut Model) {
     let mut updates = HashMap::new();
-    let mut removed = vec![];
-    for info in model.planetoids.iter() {
-        let (name, planetoid) = info;
-        for info_2 in model.planetoids.iter() {
-            let (name_2, planetoid_2) = info_2;
-            if name != name_2 {
+    let mut removed = BinaryHeap::new();
+    for i in 0..model.planetoids.len() {
+        let planetoid = &model.planetoids[i];
+        for j in 0..model.planetoids.len() {
+            if i != j {
+                let planetoid_2 = &model.planetoids[j];
                 let distance = (planetoid.position - planetoid_2.position).magnitude();
                 if distance <= planetoid.size.x + planetoid_2.size.x {
                     if planetoid.size.x > planetoid_2.size.x {
-                        updates.insert(name.clone(), (planetoid_2.mass, planetoid_2.size));
-                        removed.push(name_2.clone());
+                        updates.insert(i, (planetoid_2.mass, planetoid_2.size));
+                        removed.push(j);
                     } else {
-                        updates.insert(name_2.clone(), (planetoid.mass, planetoid.size));
-                        removed.push(name.clone());
+                        updates.insert(j, (planetoid.mass, planetoid.size));
+                        removed.push(i);
                     }
                 }
             }
         }
     }
 
-    for update in updates.iter() {
-        let (name, (mass, size)) = update;
-        let planetoid = model.planetoids.get_mut(name).unwrap();
+    for (i, (mass, size)) in updates.iter() {
+        let planetoid = &mut model.planetoids[i.clone()];
         planetoid.mass += mass;
         planetoid.size += *size;
     }
-    for name in removed {
-        model.planetoids.remove(&name);
+    let mut i = 0;
+    while removed.len() != 0 {
+        model.planetoids.remove(removed.pop().unwrap() - i);
+        i += 1
     }
 }
 
-/// Returns a Hash Map of the gravitational influence for each planet.
+/// Calculates the gravitational influence for each planet and applies it
 /// Influence measured by acceleration (km/s^2)
 ///
 /// # Arguments
 ///
 /// * `model` - A nannou model that has information about the planets
+/// * `progress_per_update` - How much progress is applied per update tick
 ///
-fn get_gravitational_influences(model: &Model) -> HashMap<String, Vector2> {
-    let mut influences: HashMap<String, Vector2> = HashMap::new();
+fn calculate_gravitational_influences(model: &mut Model, progress_per_update: f32) {
+    let mut influences: HashMap<usize, Vector2> = HashMap::new();
 
-    for info in model.planetoids.iter() {
-        let (name, planetoid) = info;
-        for info_2 in model.planetoids.iter() {
-            let (name_2, planetoid_2) = info_2;
-            if (name != name_2) && planetoid.is_active {
+    for i in 0..model.planetoids.len() {
+        let planetoid = &model.planetoids[i];
+        for j in 0..model.planetoids.len() {
+            if i != j && planetoid.is_active {
+                let planetoid_2 = &model.planetoids[j];
                 let distance = ((planetoid_2.position.x - planetoid.position.x).powi(2)
                     + (planetoid_2.position.y - planetoid.position.y).powi(2))
                 .sqrt();
@@ -154,26 +153,27 @@ fn get_gravitational_influences(model: &Model) -> HashMap<String, Vector2> {
                 .normalize()
                     * (gravitational_force / planetoid.mass);
 
-                if influences.contains_key(name) {
-                    let mut influence = influences.get_mut(name).unwrap();
+                if influences.contains_key(&i) {
+                    let mut influence = influences.get_mut(&i).unwrap();
                     influence.x += acceleration.x;
                     influence.y += acceleration.y;
                 } else {
-                    influences.insert(name.clone(), acceleration);
+                    influences.insert(i, acceleration);
                 }
             }
         }
     }
 
-    influences
+    for (i, influence) in influences.iter() {
+        model.planetoids[i.clone()].speed += *influence * progress_per_update;
+    }
 }
 
 fn view(app: &App, model: &Model, frame: Frame) {
     let draw = app.draw();
     draw.background().color(BLACK);
 
-    for planet_info in model.planetoids.iter() {
-        let (_, planetoid) = planet_info;
+    for planetoid in model.planetoids.iter() {
         draw.ellipse()
             .xy(planetoid.position)
             .wh(planetoid.size)
