@@ -1,3 +1,6 @@
+// Use this to hide CMD in production
+// #![windows_subsystem = "windows"]
+
 use nannou::prelude::*;
 use std::collections::HashMap;
 
@@ -12,6 +15,8 @@ struct Planetoid {
 }
 
 struct Model {
+    _window: WindowId,
+    is_creating: bool,
     gravitational_const: f32,
     time_scale: u8,
     update_rate: u8,
@@ -21,11 +26,10 @@ struct Model {
 fn main() {
     nannou::app(model)
         .update(update)
-        .simple_window(view)
         .run();
 }
 
-fn model(_app: &App) -> Model {
+fn model(app: &App) -> Model {
     let mut planetoids = vec![];
 
     planetoids.push(
@@ -43,7 +47,7 @@ fn model(_app: &App) -> Model {
         Planetoid {
             position: vec2(-450.0, 0.0),
             radius: 5.0,
-            speed: vec2(0.0, -25.0),
+            speed: vec2(0.0, 25.0),
             mass: 3.0 * 10.0.powi(22),
             is_active: true,
             color: ORANGE,
@@ -54,20 +58,55 @@ fn model(_app: &App) -> Model {
         Planetoid {
             position: vec2(-400.0, 0.0),
             radius: 8.0,
-            speed: vec2(1.0, -20.0),
+            speed: vec2(-1.0, 20.0),
             mass: 3.0 * 10.0.powi(19),
             is_active: true,
             color: ORANGE,
         }
     );
 
+    let _window = app
+        .new_window()
+        .size(1280, 720)
+        .title("Rusty Planets")
+        .event(event)
+        .view(view)
+        .build()
+        .unwrap();
+
     Model {
+        _window,
+        is_creating: false,
         // Gravitational Constant to the -20 for km rather than m
         gravitational_const: 6.674 * 10.0.powi(-20),
         time_scale: 1,
         update_rate: 60,
         planetoids,
     }
+}
+
+fn event(app: &App, model: &mut Model, event: WindowEvent) {
+    match event {
+        MousePressed(MouseButton::Left) => {
+            // Begin Creation Process
+            if !model.is_creating {
+                handle_press(app, model);
+            } else {
+                // Branch for when determining velocity?
+            }
+        }
+        MouseReleased(MouseButton::Left) => {
+            // Launch planet or determine size (Both?)
+        }
+        _ => ()
+    }
+}
+
+fn handle_press(app: &App, model: &mut Model) {
+    let mouse_position = app.mouse.position();
+    model.is_creating = true;
+
+    println!("{} {}", mouse_position.x, mouse_position.y);
 }
 
 // Update runs 60fps default
