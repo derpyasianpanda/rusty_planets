@@ -1,11 +1,10 @@
 use nannou::prelude::*;
 use std::collections::HashMap;
-use std::collections::BinaryHeap;
 
 // Distance units are in kilometers and time is measured in seconds
 struct Planetoid {
     position: Vector2,
-    size: Vector2,
+    radius: f32,
     speed: Vector2,
     mass: f32,
     is_active: bool,
@@ -33,7 +32,7 @@ fn model(_app: &App) -> Model {
     planetoids.push(
         Planetoid {
             position: vec2(0.0, 0.0),
-            size: vec2(20.0, 20.0),
+            radius: 10.0,
             speed: vec2(0.0, 0.0),
             mass: 6.0 * 10.0.powi(24),
             is_active: true,
@@ -43,8 +42,19 @@ fn model(_app: &App) -> Model {
 
     planetoids.push(
         Planetoid {
+            position: vec2(200.0, 0.0),
+            radius: 10.0,
+            speed: vec2(0.0, 10.0),
+            mass: 6.0 * 10.0.powi(24),
+            is_active: true,
+            color: GREEN,
+        }
+    );
+
+    planetoids.push(
+        Planetoid {
             position: vec2(-450.0, 0.0),
-            size: vec2(10.0, 10.0),
+            radius: 5.0,
             speed: vec2(0.0, -25.0),
             mass: 3.0 * 10.0.powi(22),
             is_active: true,
@@ -55,7 +65,7 @@ fn model(_app: &App) -> Model {
     planetoids.push(
         Planetoid {
             position: vec2(-400.0, 0.0),
-            size: vec2(20.0, 20.0),
+            radius: 8.0,
             speed: vec2(1.0, -20.0),
             mass: 3.0 * 10.0.powi(19),
             is_active: true,
@@ -87,22 +97,24 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
 
 fn event(_app: &App, _model: &mut Model, _event: Event) {}
 
-// TODO: FIX COLLISIONS. THINGS DISAPPEAR WHEN THEY SHOULDN'T
 fn handle_collisions(model: &mut Model) {
     let mut updates = HashMap::new();
-    let mut removed = BinaryHeap::new();
+    let mut removed = vec![];
+
     for i in 0..model.planetoids.len() {
         let planetoid = &model.planetoids[i];
         for j in 0..model.planetoids.len() {
             if i != j {
                 let planetoid_2 = &model.planetoids[j];
                 let distance = (planetoid.position - planetoid_2.position).magnitude();
-                if distance <= planetoid.size.x + planetoid_2.size.x {
-                    if planetoid.size.x > planetoid_2.size.x {
-                        updates.insert(i, (planetoid_2.mass, planetoid_2.size));
+                if distance <= planetoid.radius + planetoid_2.radius {
+                    if planetoid.radius > planetoid_2.radius {
+                        updates.insert(i,
+                            (planetoid_2.mass, planetoid_2.radius, planetoid_2.speed));
                         removed.push(j);
                     } else {
-                        updates.insert(j, (planetoid.mass, planetoid.size));
+                        updates.insert(j,
+                            (planetoid.mass, planetoid.radius, planetoid.speed));
                         removed.push(i);
                     }
                 }
@@ -110,15 +122,22 @@ fn handle_collisions(model: &mut Model) {
         }
     }
 
-    for (i, (mass, size)) in updates.iter() {
+    removed.sort_unstable();
+
+    for (i, (mass, radius, speed)) in updates.iter() {
         let planetoid = &mut model.planetoids[i.clone()];
+        let mass_ratio = mass / planetoid.mass;
         planetoid.mass += mass;
-        planetoid.size += *size;
+        planetoid.radius += *radius;
+        planetoid.speed.x += speed.x * mass_ratio;
+        planetoid.speed.y += speed.y * mass_ratio;
     }
+
     let mut i = 0;
     while removed.len() != 0 {
+        removed.pop();
         model.planetoids.remove(removed.pop().unwrap() - i);
-        i += 1
+        i += 1;
     }
 }
 
@@ -176,7 +195,7 @@ fn view(app: &App, model: &Model, frame: Frame) {
     for planetoid in model.planetoids.iter() {
         draw.ellipse()
             .xy(planetoid.position)
-            .wh(planetoid.size)
+            .radius(planetoid.radius)
             .color(planetoid.color);
     }
 
