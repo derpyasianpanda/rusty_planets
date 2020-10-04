@@ -42,17 +42,6 @@ fn model(_app: &App) -> Model {
 
     planetoids.push(
         Planetoid {
-            position: vec2(200.0, 0.0),
-            radius: 10.0,
-            speed: vec2(0.0, 10.0),
-            mass: 6.0 * 10.0.powi(24),
-            is_active: true,
-            color: GREEN,
-        }
-    );
-
-    planetoids.push(
-        Planetoid {
             position: vec2(-450.0, 0.0),
             radius: 5.0,
             speed: vec2(0.0, -25.0),
@@ -107,8 +96,8 @@ fn handle_collisions(model: &mut Model) {
             if i != j {
                 let planetoid_2 = &model.planetoids[j];
                 let distance = (planetoid.position - planetoid_2.position).magnitude();
-                if distance <= planetoid.radius + planetoid_2.radius {
-                    if planetoid.radius > planetoid_2.radius {
+                if distance <= (planetoid.radius + planetoid_2.radius) {
+                    if planetoid.mass > planetoid_2.mass {
                         updates.insert(i,
                             (planetoid_2.mass, planetoid_2.radius, planetoid_2.speed));
                         removed.push(j);
@@ -122,22 +111,19 @@ fn handle_collisions(model: &mut Model) {
         }
     }
 
-    removed.sort_unstable();
-
     for (i, (mass, radius, speed)) in updates.iter() {
         let planetoid = &mut model.planetoids[i.clone()];
         let mass_ratio = mass / planetoid.mass;
         planetoid.mass += mass;
-        planetoid.radius += *radius;
+        planetoid.radius += radius;
         planetoid.speed.x += speed.x * mass_ratio;
         planetoid.speed.y += speed.y * mass_ratio;
     }
 
-    let mut i = 0;
+    removed.sort_unstable_by(|a, b| b.cmp(a));
     while removed.len() != 0 {
         removed.pop();
-        model.planetoids.remove(removed.pop().unwrap() - i);
-        i += 1;
+        model.planetoids.remove(removed.pop().unwrap());
     }
 }
 
