@@ -20,7 +20,6 @@ struct Model {
 
 fn main() {
     nannou::app(model)
-        .event(event)
         .update(update)
         .simple_window(view)
         .run();
@@ -83,8 +82,6 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
         }
     }
 }
-
-fn event(_app: &App, _model: &mut Model, _event: Event) {}
 
 fn handle_collisions(model: &mut Model) {
     let mut updates = HashMap::new();
