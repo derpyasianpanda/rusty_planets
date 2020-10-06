@@ -4,6 +4,12 @@
 use nannou::prelude::*;
 use std::collections::HashMap;
 
+enum CreationState {
+    Radius,
+    Speed,
+    Nil,
+}
+
 // Distance units are in kilometers and time is measured in seconds
 struct Planetoid {
     position: Vector2,
@@ -14,16 +20,11 @@ struct Planetoid {
     color: Rgb<u8>,
 }
 
-enum CreationState {
-    Radius,
-    Speed,
-    Nil,
-}
-
 struct Model {
-    _window: WindowId,
+    window: WindowId,
     creation_state: CreationState,
     gravitational_const: f32,
+    density: f32,
     time_scale: u8,
     update_rate: u8,
     planetoids: Vec<Planetoid>,
@@ -34,36 +35,7 @@ fn main() {
 }
 
 fn model(app: &App) -> Model {
-    let mut planetoids = vec![];
-
-    planetoids.push(Planetoid {
-        position: vec2(0.0, 0.0),
-        radius: 10.0,
-        speed: vec2(0.0, 0.0),
-        mass: 6.0 * 10.0.powi(24),
-        is_active: true,
-        color: GREEN,
-    });
-
-    planetoids.push(Planetoid {
-        position: vec2(-450.0, 0.0),
-        radius: 5.0,
-        speed: vec2(0.0, 25.0),
-        mass: 3.0 * 10.0.powi(22),
-        is_active: true,
-        color: ORANGE,
-    });
-
-    planetoids.push(Planetoid {
-        position: vec2(-400.0, 0.0),
-        radius: 8.0,
-        speed: vec2(-1.0, 20.0),
-        mass: 3.0 * 10.0.powi(19),
-        is_active: true,
-        color: ORANGE,
-    });
-
-    let _window = app
+    let window = app
         .new_window()
         .size(1280, 720)
         .title("Rusty Planets")
@@ -73,56 +45,79 @@ fn model(app: &App) -> Model {
         .unwrap();
 
     Model {
-        _window,
+        window,
         creation_state: CreationState::Nil,
         // Gravitational Constant to the -20 for km rather than m
         gravitational_const: 6.674 * 10.0.powi(-20),
+        // Arbitrary Density Value to make visualization more appealing (kg/km^3)
+        density: 7.0 * 10.0.powi(18),
         time_scale: 1,
         update_rate: 60,
-        planetoids,
+        planetoids: vec![],
     }
 }
 
 fn event(app: &App, model: &mut Model, event: WindowEvent) {
     match event {
         MousePressed(MouseButton::Left) => {
-            // Begin Creation Process
-            match model.creation_state {
-                CreationState::Nil => creation_radius(app, model),
-                CreationState::Radius => creation_speed(app, model),
-                CreationState::Speed => creation_finish(app, model),
-            }
+            handle_left_click(app, model);
         }
-        MouseReleased(MouseButton::Left) => {
-            // Launch planet or determine size (Both?)
+        MousePressed(MouseButton::Right) => {
+            match model.creation_state {
+                // Delete a planet
+                CreationState::Nil => {
+                    delete_planet_at_mouse(app, model);
+                }
+
+                // Cancel the creation process
+                _ => {
+                    model.creation_state = CreationState::Nil;
+                    model.planetoids.pop();
+                }
+            }
         }
         _ => (),
     }
 }
 
-fn creation_radius(app: &App, model: &mut Model) {
-    let mouse_position = app.mouse.position();
-    model.creation_state = CreationState::Radius;
+fn handle_left_click(app: &App, model: &mut Model) {
+    match model.creation_state {
+        CreationState::Nil => {
+            model.planetoids.push(Planetoid {
+                position: app.mouse.position(),
+                radius: 2.0,
+                speed: vec2(0.0, 0.0),
+                mass: 2.0 * 10.0.powi(18),
+                is_active: false,
+                color: GREEN,
+            });
+            model.creation_state = CreationState::Radius;
+        }
 
-    println!("Radius @ {} {}", mouse_position.x, mouse_position.y);
+        CreationState::Radius => {
+            model.creation_state = CreationState::Speed;
+        }
+
+        CreationState::Speed => {
+            model.creation_state = CreationState::Nil;
+            model.planetoids.last_mut().unwrap().is_active = true;
+        }
+    }
 }
 
-fn creation_speed(app: &App, model: &mut Model) {
+fn delete_planet_at_mouse(app: &App, model: &mut Model) {
     let mouse_position = app.mouse.position();
-    model.creation_state = CreationState::Speed;
-
-    println!("Speed @ {} {}", mouse_position.x, mouse_position.y);
-}
-
-fn creation_finish(app: &App, model: &mut Model) {
-    let mouse_position = app.mouse.position();
-    model.creation_state = CreationState::Nil;
-
-    println!("Finish @ {} {}", mouse_position.x, mouse_position.y);
+    for i in 0..model.planetoids.len() {
+        let planetoid = &model.planetoids[i];
+        if (mouse_position - planetoid.position).magnitude() <= planetoid.radius {
+            model.planetoids.remove(i);
+            break;
+        }
+    }
 }
 
 // Update runs 60fps default
-fn update(_app: &App, model: &mut Model, _update: Update) {
+fn update(app: &App, model: &mut Model, _update: Update) {
     let progress_per_update = model.time_scale as f32 / model.update_rate as f32;
     handle_collisions(model);
     calculate_gravitational_influences(model, progress_per_update);
@@ -131,9 +126,23 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
         // Update Model in some way when creating a planet
         // Note: Fairly certain last element of the planetoids vector will
         // always reference the planetoid in creation
-        CreationState::Nil => (),
-        CreationState::Radius => (),
-        CreationState::Speed => (),
+        CreationState::Radius => {
+            let planetoid = model.planetoids.last_mut().unwrap();
+            planetoid.radius = (planetoid.position - app.mouse.position()).magnitude();
+            planetoid.mass = (4.0 / 3.0) * PI * planetoid.radius.powi(3) * model.density;
+        }
+
+        CreationState::Speed => {
+            let planetoid = model.planetoids.last_mut().unwrap();
+            let direction = app.mouse.position() - planetoid.position;
+            if direction.magnitude() > 6.0 {
+                planetoid.speed = direction.normalize() * direction.magnitude() / 2.0;
+            } else {
+                planetoid.speed = Vector2::new(0.0, 0.0);
+            }
+        }
+
+        _ => (),
     }
 
     for planetoid in model.planetoids.iter_mut() {
@@ -196,37 +205,26 @@ fn handle_collisions(model: &mut Model) {
 /// * `progress_per_update` - How much progress is applied per update tick
 ///
 fn calculate_gravitational_influences(model: &mut Model, progress_per_update: f32) {
-    let mut influences: HashMap<usize, Vector2> = HashMap::new();
-
     for i in 0..model.planetoids.len() {
         let planetoid = &model.planetoids[i];
-        for j in 0..model.planetoids.len() {
-            if i != j && planetoid.is_active {
-                let planetoid_2 = &model.planetoids[j];
-                let distance = ((planetoid_2.position.x - planetoid.position.x).powi(2)
-                    + (planetoid_2.position.y - planetoid.position.y).powi(2))
-                .sqrt();
+        if planetoid.is_active {
+            let position = planetoid.position;
+            let mass = planetoid.mass;
+            for j in 0..model.planetoids.len() {
+                let planetoid_2 = &mut model.planetoids[j];
+                if i != j && planetoid_2.is_active {
+                    let distance = (position - planetoid_2.position).magnitude();
 
-                let gravitational_force =
-                    model.gravitational_const * planetoid.mass * planetoid_2.mass
-                        / distance.powi(2);
+                    let gravitational_force =
+                        model.gravitational_const * mass * planetoid_2.mass / distance.powi(2);
 
-                let acceleration = vec2(
-                    planetoid_2.position.x - planetoid.position.x,
-                    planetoid_2.position.y - planetoid.position.y,
-                )
-                .normalize()
-                    * (gravitational_force / planetoid.mass);
+                    let acceleration = (position - planetoid_2.position).normalize()
+                        * (gravitational_force / planetoid_2.mass);
 
-                let mut influence = influences.entry(i).or_default();
-                influence.x += acceleration.x;
-                influence.y += acceleration.y;
+                    planetoid_2.speed += acceleration * progress_per_update;
+                }
             }
         }
-    }
-
-    for (i, influence) in influences.iter() {
-        model.planetoids[*i].speed += *influence * progress_per_update;
     }
 }
 
@@ -234,19 +232,27 @@ fn view(app: &App, model: &Model, frame: Frame) {
     let draw = app.draw();
     draw.background().color(BLACK);
 
-    match model.creation_state {
-        CreationState::Speed => {
-            // Draw an arrow or something
-        }
-        _ => (),
-    }
-
     for planetoid in model.planetoids.iter() {
         draw.ellipse()
             .xy(planetoid.position)
             .radius(planetoid.radius)
             .color(planetoid.color);
     }
+
+    match model.creation_state {
+        CreationState::Speed => {
+            let planetoid = model.planetoids.last().unwrap();
+            draw.arrow()
+                .weight(planetoid.speed.magnitude().log(5.0))
+                .start(planetoid.position)
+                .end(planetoid.position + planetoid.speed);
+        }
+        _ => (),
+    }
+
+    let window = app.window(model.window).unwrap().rect();
+    let top_left = Rect::from_w_h(100.0, 10.0).top_left_of(window);
+    draw.text("Something").xy(top_left.xy());
 
     draw.to_frame(app, &frame).unwrap();
 }
