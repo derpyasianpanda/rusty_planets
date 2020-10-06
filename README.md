@@ -6,7 +6,7 @@ My first dive into what I hear is a wonderful language called Rust! I'm using th
 ## Features
 
 - Physically accurate forces
-- Ability to create planetoids (TODO)
+- Ability to create/delete planetoids
 - Customizable/Personalizable Planets (TODO)
 - Custom universe parameters (TODO)
 
