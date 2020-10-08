@@ -185,8 +185,8 @@ fn handle_collisions(model: &mut Model) {
         let mass_sum = mass + planetoid.mass;
         planetoid.mass += mass;
         planetoid.radius = (radius.powi(3) + planetoid.radius.powi(3)).powf(1.0 / 3.0);
-        planetoid.speed.x += ((mass * speed.x) + (planetoid.mass * planetoid.speed.x)) / mass_sum;
-        planetoid.speed.y += ((mass * speed.y) + (planetoid.mass * planetoid.speed.y)) / mass_sum;
+        planetoid.speed.x = ((mass * speed.x) + (planetoid.mass * planetoid.speed.x)) / mass_sum;
+        planetoid.speed.y = ((mass * speed.y) + (planetoid.mass * planetoid.speed.y)) / mass_sum;
     }
 
     removed.sort_unstable_by(|a, b| b.cmp(a));
