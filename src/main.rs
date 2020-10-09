@@ -22,6 +22,7 @@ struct Planetoid {
 
 struct Model {
     window: WindowId,
+    background_texture: wgpu::Texture,
     creation_state: CreationState,
     gravitational_const: f32,
     density: f32,
@@ -44,8 +45,13 @@ fn model(app: &App) -> Model {
         .build()
         .unwrap();
 
+    let assets = app.assets_path().unwrap();
+    let img_path = assets.join("images").join("space.jpg");
+    let background_texture = wgpu::Texture::from_path(app, img_path).unwrap();
+
     Model {
         window,
+        background_texture,
         creation_state: CreationState::Nil,
         // Gravitational Constant to the -20 for km rather than m
         gravitational_const: 6.674 * 10.0.powi(-20),
@@ -62,6 +68,7 @@ fn event(app: &App, model: &mut Model, event: WindowEvent) {
         MousePressed(MouseButton::Left) => {
             handle_left_click(app, model);
         }
+
         MousePressed(MouseButton::Right) => {
             match model.creation_state {
                 // Delete a planet
@@ -76,6 +83,15 @@ fn event(app: &App, model: &mut Model, event: WindowEvent) {
                 }
             }
         }
+
+        KeyPressed(Key::Up) => {
+            model.density *= 2.0;
+        }
+
+        KeyPressed(Key::Down) => {
+            model.density /= 2.0;
+        }
+
         _ => (),
     }
 }
@@ -230,7 +246,15 @@ fn calculate_gravitational_influences(model: &mut Model, progress_per_update: f3
 
 fn view(app: &App, model: &Model, frame: Frame) {
     let draw = app.draw();
-    draw.background().color(BLACK);
+    let window = app.window(model.window).unwrap();
+    draw.texture(&model.background_texture)
+        .wh(window.rect().wh());
+
+    let title = &*format!(
+        "Rusty Planets | Current Density: {:+e} kg/km^3",
+        model.density
+    );
+    window.set_title(title);
 
     for planetoid in model.planetoids.iter() {
         draw.ellipse()
@@ -249,10 +273,6 @@ fn view(app: &App, model: &Model, frame: Frame) {
         }
         _ => (),
     }
-
-    let window = app.window(model.window).unwrap().rect();
-    let top_left = Rect::from_w_h(100.0, 10.0).top_left_of(window);
-    draw.text("Something").xy(top_left.xy());
 
     draw.to_frame(app, &frame).unwrap();
 }
