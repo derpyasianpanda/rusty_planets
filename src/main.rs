@@ -4,6 +4,7 @@
 use nannou::prelude::*;
 use std::collections::HashMap;
 
+// Marks each stage in planet creation
 enum CreationState {
     Radius,
     Speed,
@@ -31,6 +32,7 @@ struct Model {
     planetoids: Vec<Planetoid>,
 }
 
+// Kick off the program
 fn main() {
     nannou::app(model).update(update).run();
 }
@@ -45,6 +47,7 @@ fn model(app: &App) -> Model {
         .build()
         .unwrap();
 
+    // Load space image for background
     let assets = app.assets_path().unwrap();
     let img_path = assets.join("images").join("space.jpg");
     let background_texture = wgpu::Texture::from_path(app, img_path).unwrap();
@@ -56,6 +59,7 @@ fn model(app: &App) -> Model {
         // Gravitational Constant to the -20 for km rather than m
         gravitational_const: 6.674 * 10.0.powi(-20),
         // Arbitrary Density Value to make visualization more appealing (kg/km^3)
+        // Increase density using arrow keys
         density: 7.0 * 10.0.powi(18),
         time_scale: 1,
         update_rate: 60,
@@ -63,6 +67,7 @@ fn model(app: &App) -> Model {
     }
 }
 
+// Runs every time an event happens in the main window
 fn event(app: &App, model: &mut Model, event: WindowEvent) {
     match event {
         MousePressed(MouseButton::Left) => {
@@ -96,6 +101,13 @@ fn event(app: &App, model: &mut Model, event: WindowEvent) {
     }
 }
 
+/// Handles a the left click. Mostly takes care of planet creation
+///
+/// # Arguments
+///
+/// * `app` - A nannou construct that represents the basic app state
+/// * `model` - A nannou model that has information about the planets
+///
 fn handle_left_click(app: &App, model: &mut Model) {
     match model.creation_state {
         CreationState::Nil => {
@@ -121,6 +133,13 @@ fn handle_left_click(app: &App, model: &mut Model) {
     }
 }
 
+/// Removes the planet at the current mouse's position
+///
+/// # Arguments
+///
+/// * `app` - A nannou construct that represents the basic app state
+/// * `model` - A nannou model that has information about the planets
+///
 fn delete_planet_at_mouse(app: &App, model: &mut Model) {
     let mouse_position = app.mouse.position();
     for i in 0..model.planetoids.len() {
@@ -133,6 +152,7 @@ fn delete_planet_at_mouse(app: &App, model: &mut Model) {
 }
 
 // Update runs 60fps default
+// Updates the model to reflect the simulation
 fn update(app: &App, model: &mut Model, _update: Update) {
     let progress_per_update = model.time_scale as f32 / model.update_rate as f32;
     handle_collisions(model);
@@ -168,6 +188,13 @@ fn update(app: &App, model: &mut Model, _update: Update) {
     }
 }
 
+/// Detects collisions between planets within the model and handles the physics
+/// for if they collide
+///
+/// # Arguments
+///
+/// * `model` - A nannou model that has information about the planets
+///
 fn handle_collisions(model: &mut Model) {
     let mut updates = HashMap::new();
     let mut removed = vec![];
@@ -244,9 +271,11 @@ fn calculate_gravitational_influences(model: &mut Model, progress_per_update: f3
     }
 }
 
+//  Runs at every frame update to display what is within the model
 fn view(app: &App, model: &Model, frame: Frame) {
     let draw = app.draw();
     let window = app.window(model.window).unwrap();
+
     draw.texture(&model.background_texture)
         .wh(window.rect().wh());
 
@@ -263,15 +292,13 @@ fn view(app: &App, model: &Model, frame: Frame) {
             .color(planetoid.color);
     }
 
-    match model.creation_state {
-        CreationState::Speed => {
-            let planetoid = model.planetoids.last().unwrap();
-            draw.arrow()
-                .weight(planetoid.speed.magnitude().log(5.0))
-                .start(planetoid.position)
-                .end(planetoid.position + planetoid.speed);
-        }
-        _ => (),
+    // Draw arrow to indicate speed when creating a planet
+    if let CreationState::Speed = model.creation_state {
+        let planetoid = model.planetoids.last().unwrap();
+        draw.arrow()
+            .weight(planetoid.speed.magnitude().log(5.0))
+            .start(planetoid.position)
+            .end(planetoid.position + planetoid.speed);
     }
 
     draw.to_frame(app, &frame).unwrap();
