@@ -7,8 +7,7 @@ My first dive into what I hear is a wonderful language called Rust! I'm using th
 
 - Physically accurate forces
 - Ability to create/delete planetoids
-- Customizable/Personalizable Planets (TODO)
-- Custom universe parameters (TODO)
+- Custom universe parameters (Have different densities using arrow keys)
 
 ## Notes about using Rust for the first time
 
